@@ -8,29 +8,30 @@ services:
 
     ports:
       - "443:443"
-      #- "8080:8080"
 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./certs/:/certs/
 
     environment:
-      #- TRAEFIK_API_INSECURE=true
       - TRAEFIK_API_DASHBOARD=true
       - TRAEFIK_LOG_LEVEL=INFO
       - TRAEFIK_PROVIDERS_DOCKER_EXPOSEDBYDEFAULT=false
       - TRAEFIK_ENTRYPOINTS_websecure_ADDRESS=:443
+      # SSL certificates should copy into ./certs folder and describe in dynamic-conf.yml file.
       - TRAEFIK_PROVIDERS_FILE_FILENAME=/certs/dynamic-conf.yml
     
     labels:
       - "traefik.enable=true"
+      # This section configure the traefik API access. (https://myteam.mycompany.com/api/version)
       - "traefik.http.routers.api.entrypoints=websecure"
       - "traefik.http.routers.api.rule=Host(`myteam.mycompany.com`) && (PathPrefix(`/api`))"
       - "traefik.http.routers.api.service=api@internal"
       - "traefik.http.routers.api.tls=true"
       - "traefik.http.routers.api.middlewares=auth"
+      # Adding basic auth for accessing the relative service. Username: oks | Password: oks123
       - "traefik.http.middlewares.auth.basicauth.users=oks:$$apr1$$FHIBLWUW$$BGmEQZHCrCyFlJpPjtRW4."
-
+      # This section configures the Traefik dashboard. (https://myteam.mycompany.com/traefik/)
       - "traefik.http.routers.dashboard.entrypoints=websecure"
       - "traefik.http.routers.dashboard.rule=Host(`myteam.mycompany.com`) && (PathPrefix(`/traefik`))"
       - "traefik.http.routers.dashboard.service=dashboard@internal"
