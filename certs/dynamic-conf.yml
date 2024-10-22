@@ -1,0 +1,4 @@
+tls:
+  certificates:
+    - certFile: /certs/myteam.crt
+      keyFile: /certs/myteam.key
