@@ -1,0 +1,54 @@
+version: '3.1'
+
+services:
+  bookstack:
+    image: lscr.io/linuxserver/bookstack:latest
+    container_name: bookstack
+    # This docker compose file derived from official linuxserver.io github repository. For details:
+    # https://github.com/linuxserver/docker-bookstack
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Istanbul
+      - APP_URL=https://myteam.mycompany.com/bookstack
+      - APP_KEY=base64:sNAXWAYOzlfOKE/a8QtnIWihlwLv2KiMMVl5Yp2Kuxg=
+      - DB_HOST=db_bookstack
+      - DB_PORT=3306
+      - DB_USERNAME=bookstack
+      - DB_PASSWORD=bookstack
+      - DB_DATABASE=bookstack
+    volumes:
+      - ./bookstack/application:/config
+    #ports:
+    #  - 6875:80
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bookstack.entrypoints=websecure"
+      - "traefik.http.routers.bookstack.rule=Host(`myteam.mycompany.com`) && (PathPrefix(`/bookstack`))"
+      - "traefik.http.services.bookstack.loadbalancer.server.port=80"
+      - "traefik.http.routers.bookstack.tls=true"
+      - "traefik.http.routers.bookstack.middlewares=bookstack_path_prefix"
+      # The label below, strips /bookstack prefix before deliver the request by traefik.
+      - "traefik.http.middlewares.bookstack_path_prefix.stripprefix.prefixes=/bookstack"
+    #networks:
+    #  - bookstack
+
+  db_bookstack:
+    image: mysql:8.4.3
+    restart: always
+    container_name: db_bookstack
+    environment:
+      MYSQL_RANDOM_ROOT_PASSWORD: 'yes'
+      MYSQL_DATABASE: bookstack
+      MYSQL_USER: bookstack
+      MYSQL_PASSWORD: bookstack
+    volumes: 
+      - ./bookstack/database:/var/lib/mysql
+    #networks:
+    #  - bookstack
+
+#networks:
+#  bookstack:
+
+    
