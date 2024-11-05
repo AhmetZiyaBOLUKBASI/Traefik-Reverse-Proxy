@@ -1,6 +1,6 @@
 # https://docs.docker.com/compose/environment-variables/
 
-version: "2.4"
+#version: "2.4"
 
 services:
   postgres:
@@ -48,6 +48,9 @@ services:
       # to avoid Token request failed: certificate signed by unknown authority 
       # (link: https://github.com/mattermost/mattermost-server/issues/13059 and https://github.com/mattermost/docker/issues/34)
       # - ${GITLAB_PKI_CHAIN_PATH}:/etc/ssl/certs/pki_chain.pem:ro
+
+      # Sync container date and time with host
+      - /etc/localtime:/etc/localtime:ro
     environment:
       # timezone inside container
       - TZ=Europe/Istanbul
@@ -71,3 +74,11 @@ services:
       # The label below, strips /mattermost prefix before deliver the request by traefik.
       #- "traefik.http.middlewares.mattermost_path_prefix.stripprefix.prefixes=/mattermost"
       # https://myteam.mycompany.com/mattermost/signup_user_complete/?id=t9r5wthpipypjpx5ywgs646q9a
+      - "traefik.tcp.routers.mattermostcalls.entrypoints=mattermostcallstcp"
+      - "traefik.tcp.routers.mattermostcalls.rule=HostSNI(`myteam.mycompany.com`)"
+      - "traefik.tcp.services.mattermost.loadbalancer.server.port=8443"
+      - "traefik.tcp.routers.mattermostcalls.tls=true"
+      - "traefik.tcp.routers.mattermostcalls.tls.passthrough=true"
+      # UDP routers and services
+      - "traefik.udp.routers.mattermostcalls.entrypoints=mattermostcallsudp"
+      - "traefik.udp.services.mattermost.loadbalancer.server.port=8443"
