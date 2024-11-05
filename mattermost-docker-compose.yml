@@ -1,0 +1,84 @@
+# https://docs.docker.com/compose/environment-variables/
+
+#version: "2.4"
+
+services:
+  postgres:
+    image: postgres:13-alpine
+    container_name: postgres
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 100
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql
+    volumes:
+      - ./mattermost/db/var/lib/postgresql/data:/var/lib/postgresql/data
+    environment:
+      # timezone inside container
+      - TZ=Europe/Istanbul
+
+      # necessary Postgres options/variables
+      - POSTGRES_USER=mmuser
+      - POSTGRES_PASSWORD=mmuser_password
+      - POSTGRES_DB=mattermost
+
+  mattermost:
+    depends_on:
+      - postgres
+    image: mattermost/mattermost-team-edition:9.11.2
+    container_name: mattermost
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 200
+    read_only: false
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./mattermost/app/mattermost/config:/mattermost/config:rw
+      - ./mattermost/app/mattermost/data:/mattermost/data:rw
+      - ./mattermost/app/mattermost/logs:/mattermost/logs:rw
+      - ./mattermost/app/mattermost/plugins:/mattermost/plugins:rw
+      - ./mattermost/app/mattermost/client/plugins:/mattermost/client/plugins:rw
+      - ./mattermost/app/mattermost/bleve-indexes:/mattermost/bleve-indexes:rw
+      # When you want to use SSO with GitLab, you have to add the cert pki chain of GitLab inside Alpine
+      # to avoid Token request failed: certificate signed by unknown authority 
+      # (link: https://github.com/mattermost/mattermost-server/issues/13059 and https://github.com/mattermost/docker/issues/34)
+      # - ${GITLAB_PKI_CHAIN_PATH}:/etc/ssl/certs/pki_chain.pem:ro
+
+      # Sync container date and time with host
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      # timezone inside container
+      - TZ=Europe/Istanbul
+
+      # necessary Mattermost options/variables (see env.example)
+      - MM_SQLSETTINGS_DRIVERNAME=postgres
+      - MM_SQLSETTINGS_DATASOURCE=postgres://mmuser:mmuser_password@postgres:5432/mattermost?sslmode=disable&connect_timeout=10
+
+      # necessary for bleve
+      - MM_BLEVESETTINGS_INDEXDIR=/mattermost/bleve-indexes
+
+      # additional settings
+      - MM_SERVICESETTINGS_SITEURL=https://myteam.mycompany.com/mattermost
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mattermost.entrypoints=websecure"
+      - "traefik.http.routers.mattermost.rule=Host(`myteam.mycompany.com`) && (PathPrefix(`/mattermost`))"
+      - "traefik.http.services.mattermost.loadbalancer.server.port=8065"
+      - "traefik.http.routers.mattermost.tls=true"
+      #- "traefik.http.routers.mattermost.middlewares=mattermost_path_prefix"
+      # The label below, strips /mattermost prefix before deliver the request by traefik.
+      #- "traefik.http.middlewares.mattermost_path_prefix.stripprefix.prefixes=/mattermost"
+      # https://myteam.mycompany.com/mattermost/signup_user_complete/?id=t9r5wthpipypjpx5ywgs646q9a
+      - "traefik.tcp.routers.mattermostcalls.entrypoints=mattermostcallstcp"
+      - "traefik.tcp.routers.mattermostcalls.rule=HostSNI(`myteam.mycompany.com`)"
+      - "traefik.tcp.services.mattermost.loadbalancer.server.port=8443"
+      - "traefik.tcp.routers.mattermostcalls.tls=true"
+      - "traefik.tcp.routers.mattermostcalls.tls.passthrough=true"
+      # UDP routers and services
+      - "traefik.udp.routers.mattermostcalls.entrypoints=mattermostcallsudp"
+      - "traefik.udp.services.mattermost.loadbalancer.server.port=8443"
